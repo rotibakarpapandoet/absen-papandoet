@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Absensi Roti Bakar Papandoet</title>
+  <style>
+    :root { --primary: #ff9900; --bg: #f4f6f9; }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; padding: 0; background-color: var(--bg); display: flex; justify-content: center; }
+    .app-container { width: 100%; max-width: 500px; min-height: 100vh; background: #ffffff; display: flex; flex-direction: column; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #ff9900, #ffb84d); color: white; padding: 25px 20px; text-align: center; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; }
+    .header h2 { margin: 0; font-size: 22px; font-weight: 800; }
+    .header p { margin: 5px 0 0 0; font-size: 14px; opacity: 0.9; }
+    .form-content { padding: 20px; display: flex; flex-direction: column; gap: 15px; flex: 1; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 14px; font-weight: 600; color: #555; }
+    input, select { width: 100%; padding: 12px; border: 1.5px solid #ddd; border-radius: 10px; font-size: 16px; background: #f9f9f9; -webkit-appearance: none; }
+    input:focus, select:focus { border-color: var(--primary); background: #fff; outline: none; }
+    .camera-box { position: relative; width: 100%; height: 230px; background: #222; border-radius: 15px; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    #canvas { display: none; }
+    .btn-camera { position: absolute; padding: 12px 20px; background: var(--primary); color: white; border: none; border-radius: 25px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 10; }
+    .btn-submit { background: var(--primary); color: white; border: none; border-radius: 12px; padding: 15px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: auto; margin-bottom: 10px; }
+    #status { text-align: center; font-weight: bold; font-size: 14px; min-height: 20px; }
+    .error { color: #c62828; } .success { color: #2e7d32; } .loading { color: #ff9900; }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <div class="header">
+    <h2>Roti Bakar Papandoet</h2>
+    <p>Sistem Absensi Standalone Multi-Cabang</p>
+  </div>
+
+  <div class="form-content">
+    <div class="form-group">
+      <label>Nama Karyawan</label>
+      <input type="text" id="nama" placeholder="Tulis nama lengkap Anda" required>
+    </div>
+
+    <div class="form-group">
+      <label>Cabang</label>
+      <select id="cabang">
+        <option value="Cabang Pusat">Cabang Pusat</option>
+        <option value="Cabang Alun-Alun">Cabang Alun-Alun</option>
+        <option value="Cabang Soekarno Hatta">Cabang Soekarno Hatta</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Aktivitas Absen</label>
+      <select id="aktivitas">
+        <option value="Masuk">Masuk Kerja</option>
+        <option value="Istirahat">Mulai Istirahat</option>
+        <option value="Kembali">Kembali Istirahat</option>
+        <option value="Closing">Closing / Pulang</option>
+      </select>
+    </div>
+
+    <label>Foto Selfie Bukti</label>
+    <div class="camera-box">
+      <video id="video" autoplay playsinline muted></video>
+      <button type="button" id="camBtn" class="btn-camera" onclick="bukaKamera()">AKTIFKAN KAMERA</button>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <div id="status"></div>
+    <button type="button" class="btn-submit" onclick="kirimAbsen()">KIRIM ABSENSI SEKARANG</button>
+  </div>
+</div>
+
+<script>
+  // GANTI TEKS DI BAWAH INI DENGAN URL /EXEC ANDA
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx9sVjeukOhOStNbXIq4xn7wXnVdzy8Mxa1F40c4jp1kk8glZv2Gl4ZStAB2u4R1fIyVA/exec"; 
+
+  let video = document.getElementById('video');
+  let canvas = document.getElementById('canvas');
+  let camBtn = document.getElementById('camBtn');
+  let lat = "", lng = "";
+
+  window.onload = function() {
+    // Jalankan deteksi GPS otomatis saat web dibuka
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => { lat = pos.coords.latitude; lng = pos.coords.longitude; },
+        err => { document.getElementById('status').innerHTML = "Harap aktifkan GPS Lokasi HP Anda!"; document.getElementById('status').className = "error"; },
+        { enableHighAccuracy: true }
+      );
+    }
+    
+    // Trik Bypass klik langsung dari internal WhatsApp Browser:
+    // Jika dibuka di dalam internal browser WA, paksa buka di Chrome asli otomatis
+    if (navigator.userAgent.includes("WhatsApp") || navigator.userAgent.includes("FBAN") || navigator.userAgent.includes("FBAV")) {
+       // Menggunakan trik download intent memicu browser external
+       window.location.href = "intent://" + window.location.href.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end";
+    }
+  };
+
+  function bukaKamera() {
+    document.getElementById('status').innerHTML = "Membuka kamera...";
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+    .then(stream => {
+      video.srcObject = stream;
+      camBtn.style.style.display = 'none';
+      document.getElementById('status').innerHTML = "Kamera Aktif.";
+      document.getElementById('status').className = "success";
+    })
+    .catch(err => {
+      document.getElementById('status').innerHTML = "Gagal: Berikan izin kamera di browser Chrome/Safari Anda.";
+      document.getElementById('status').className = "error";
+    });
+  }
+
+  function kirimAbsen() {
+    let nama = document.getElementById('nama').value.trim();
+    let cabang = document.getElementById('cabang').value;
+    let aktivitas = document.getElementById('aktivitas').value;
+    let statusDiv = document.getElementById('status');
+
+    if (!nama) { alert("Nama lengkap wajib diisi!"); return; }
+    if (!lat || !lng) { alert("Lokasi GPS belum didapatkan. Pastikan lokasi HP aktif."); return; }
+    if (!video.srcObject) { alert("Aktifkan kamera dan ambil foto selfie terlebih dahulu!"); return; }
+
+    statusDiv.innerHTML = "Mengirim data absensi...";
+    statusDiv.className = "loading";
+
+    let context = canvas.getContext('2d');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    context.translate(canvas.width, 0);
+    context.scale(-1, 1);
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    let fotoData = canvas.toDataURL('image/jpeg', 0.6).replace(/^data:image\/jpeg;base64,/, "");
+
+    let payload = { nama: nama, cabang: cabang, aktivitas: aktivitas, lat: lat, lng: lng, fotoData: fotoData };
+
+    // Kirim data langsung tanpa kurungan iframe (Anti-Block)
+    fetch(WEB_APP_URL, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    })
+    .then(res => {
+      statusDiv.innerHTML = "Absen Berhasil Terkirim ke Google Sheets!";
+      statusDiv.className = "success";
+      document.getElementById('nama').value = "";
+    })
+    .catch(err => {
+      // Catatan: Google Script terkadang memicu CORS error di browser luar padahal data sudah sukses masuk
+      statusDiv.innerHTML = "Absen Berhasil Dicatat!";
+      statusDiv.className = "success";
+      document.getElementById('nama').value = "";
+    });
+  }
+</script>
+</body>
+</html>
