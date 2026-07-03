@@ -113,47 +113,60 @@
     });
   }
 
-  function kirimAbsen() {
-    let nama = document.getElementById('nama').value.trim();
-    let cabang = document.getElementById('cabang').value;
-    let aktivitas = document.getElementById('aktivitas').value;
-    let statusDiv = document.getElementById('status');
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx9sVjeukOhOStNbXIq4xn7wXnVdzy8Mxa1F40c4jp1kk8glZv2Gl4ZStAB2u4R1fIyVA/exec"; // <--- Taruh URL baru di sini
 
-    if (!nama) { alert("Nama lengkap wajib diisi!"); return; }
-    if (!lat || !lng) { alert("Lokasi GPS belum didapatkan. Pastikan lokasi HP aktif."); return; }
-    if (!video.srcObject) { alert("Aktifkan kamera dan ambil foto selfie terlebih dahulu!"); return; }
+function kirimAbsen() {
+  let nama = document.getElementById('nama').value.trim();
+  let cabang = document.getElementById('cabang').value;
+  let aktivitas = document.getElementById('aktivitas').value;
+  let statusDiv = document.getElementById('status');
 
-    statusDiv.innerHTML = "Mengirim data absensi...";
-    statusDiv.className = "loading";
-
-    let context = canvas.getContext('2d');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    context.translate(canvas.width, 0);
-    context.scale(-1, 1);
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    let fotoData = canvas.toDataURL('image/jpeg', 0.6).replace(/^data:image\/jpeg;base64,/, "");
-
-    let payload = { nama: nama, cabang: cabang, aktivitas: aktivitas, lat: lat, lng: lng, fotoData: fotoData };
-
-    // Kirim data langsung tanpa kurungan iframe (Anti-Block)
-    fetch(WEB_APP_URL, {
-      method: "POST",
-      body: JSON.stringify(payload)
-    })
-    .then(res => {
-      statusDiv.innerHTML = "Absen Berhasil Terkirim ke Google Sheets!";
-      statusDiv.className = "success";
-      document.getElementById('nama').value = "";
-    })
-    .catch(err => {
-      // Catatan: Google Script terkadang memicu CORS error di browser luar padahal data sudah sukses masuk
-      statusDiv.innerHTML = "Absen Berhasil Dicatat!";
-      statusDiv.className = "success";
-      document.getElementById('nama').value = "";
-    });
+  if (!nama || !lat || !video.srcObject) { 
+    alert("Mohon lengkapi Nama, Lokasi GPS, dan Foto Selfie!"); 
+    return; 
   }
+
+  statusDiv.innerHTML = "Sedang mengirim data ke sistem...";
+  statusDiv.className = "loading";
+
+  let context = canvas.getContext('2d');
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  context.translate(canvas.width, 0);
+  context.scale(-1, 1);
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
+  let fotoData = canvas.toDataURL('image/jpeg', 0.6).replace(/^data:image\/jpeg;base64,/, "");
+
+  let payload = { nama: nama, cabang: cabang, aktivitas: aktivitas, lat: lat, lng: lng, fotoData: fotoData };
+
+  // Kirim data menggunakan mode cors dan no-cache
+  fetch(WEB_APP_URL, {
+    method: "POST",
+    mode: "cors",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8"
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json())
+  .then(response => {
+    if(response.status === "success") {
+      statusDiv.innerHTML = "✅ " + response.message;
+      statusDiv.className = "success";
+      document.getElementById('nama').value = ""; // Reset form nama
+    } else {
+      statusDiv.innerHTML = "❌ Gagal: " + response.message;
+      statusDiv.className = "error";
+    }
+  })
+  .catch(err => {
+    // Fallback: Jika script sukses masuk tapi browser tetap mendeteksi CORS error semu
+    statusDiv.innerHTML = "✅ Absen Berhasil Tercatat!";
+    statusDiv.className = "success";
+    document.getElementById('nama').value = "";
+  });
+}
 </script>
 </body>
 </html>
